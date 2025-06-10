@@ -114,6 +114,55 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            position: relative;
+        }
+        
+        .export-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .export-btn {
+            min-width: 160px;
+        }
+        
+        .export-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background: white;
+            border: 2px solid #376eb8;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            min-width: 160px;
+            margin-top: 2px;
+        }
+        
+        .export-menu.show {
+            display: block;
+        }
+        
+        .export-option {
+            width: 100%;
+            background: none;
+            border: none;
+            color: #376eb8;
+            padding: 12px 15px;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s ease;
+        }
+        
+        .export-option:last-child {
+            border-bottom: none;
+        }
+        
+        .export-option:hover {
+            background: #f8f9fa;
         }
         
         .data-btn {
@@ -266,7 +315,14 @@
         <div class="data-section">
             <h3>Your Data</h3>
             <div class="data-buttons">
-                <button class="data-btn" onclick="exportEntries()">📤 Export Notices</button>
+                <div class="export-dropdown">
+                    <button class="data-btn export-btn" onclick="toggleExportMenu()">📤 Export Notices ▼</button>
+                    <div class="export-menu" id="exportMenu">
+                        <button class="export-option" onclick="exportEntries('json')">JSON Format</button>
+                        <button class="export-option" onclick="exportEntries('csv')">CSV (Spreadsheet)</button>
+                        <button class="export-option" onclick="exportEntries('txt')">Text File</button>
+                    </div>
+                </div>
                 <button class="data-btn" onclick="document.getElementById('importFile').click()">📥 Import Notices</button>
                 <input type="file" id="importFile" class="file-input" accept=".json" onchange="importEntries(event)">
             </div>
@@ -372,23 +428,96 @@
             }
         }
         
-        // Export entries to JSON file
-        function exportEntries() {
+        // Export entries in different formats
+        function exportEntries(format = 'json') {
             if (entries.length === 0) {
                 showStatus('No entries to export', 'error');
                 return;
             }
             
-            const dataStr = JSON.stringify(entries, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const today = new Date().toISOString().split('T')[0];
+            let dataStr, fileName, mimeType;
             
+            switch (format) {
+                case 'csv':
+                    dataStr = convertToCSV(entries);
+                    fileName = `notice-worthy-entries-${today}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+                    
+                case 'txt':
+                    dataStr = convertToText(entries);
+                    fileName = `notice-worthy-entries-${today}.txt`;
+                    mimeType = 'text/plain';
+                    break;
+                    
+                case 'json':
+                default:
+                    dataStr = JSON.stringify(entries, null, 2);
+                    fileName = `notice-worthy-entries-${today}.json`;
+                    mimeType = 'application/json';
+                    break;
+            }
+            
+            const dataBlob = new Blob([dataStr], { type: mimeType });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(dataBlob);
-            link.download = `notice-worthy-entries-${new Date().toISOString().split('T')[0]}.json`;
+            link.download = fileName;
             link.click();
             
-            showStatus(`Exported ${entries.length} entries successfully!`, 'success');
+            // Hide the export menu
+            document.getElementById('exportMenu').classList.remove('show');
+            
+            const formatName = format.toUpperCase();
+            showStatus(`Exported ${entries.length} entries as ${formatName}!`, 'success');
         }
+        
+        // Convert entries to CSV format
+        function convertToCSV(entries) {
+            const headers = ['Date/Time', 'Notice'];
+            const csvRows = [headers.join(',')];
+            
+            entries.forEach(entry => {
+                const row = [
+                    `"${entry.timestamp}"`,
+                    `"${entry.text.replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+            
+            return csvRows.join('\n');
+        }
+        
+        // Convert entries to plain text format
+        function convertToText(entries) {
+            let textContent = 'Notice Worthy - Your Self-Noticing Entries\n';
+            textContent += '==========================================\n\n';
+            
+            entries.forEach((entry, index) => {
+                textContent += `Entry ${entries.length - index}\n`;
+                textContent += `Time: ${entry.timestamp}\n`;
+                textContent += `Notice: ${entry.text}\n\n`;
+                textContent += '---\n\n';
+            });
+            
+            return textContent;
+        }
+        
+        // Toggle export menu visibility
+        function toggleExportMenu() {
+            const menu = document.getElementById('exportMenu');
+            menu.classList.toggle('show');
+        }
+        
+        // Close export menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.querySelector('.export-dropdown');
+            const menu = document.getElementById('exportMenu');
+            
+            if (dropdown && !dropdown.contains(event.target)) {
+                menu.classList.remove('show');
+            }
+        });
         
         // Import entries from JSON file
         function importEntries(event) {
